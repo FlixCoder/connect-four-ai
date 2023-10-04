@@ -1,11 +1,11 @@
 //! Connect four CLI game implementation.
 #![allow(clippy::print_stdout, clippy::expect_used)]
 
-use connect_four::IoPlayer;
+use connect_four::players::{IoPlayer, RandomPlayer};
 use game::{Error, Game, GameResult};
 
 fn main() -> Result<(), Error> {
-	let game = Game::builder().player_x(IoPlayer).player_o(IoPlayer).build()?;
+	let mut game = Game::builder().player_x(IoPlayer).player_o(RandomPlayer).build()?;
 	let result = game.run()?;
 
 	match result {

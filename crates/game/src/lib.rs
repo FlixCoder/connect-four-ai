@@ -35,7 +35,7 @@ impl Game {
 
 	/// Run the game to completion using the players as actors. Returns the game
 	/// result.
-	pub fn run(mut self) -> Result<GameResult, Error> {
+	pub fn run(&mut self) -> Result<GameResult, Error> {
 		loop {
 			let move_x = self.player_x.make_move(&self.board);
 			self.board.put_tile(move_x, Team::X)?;
