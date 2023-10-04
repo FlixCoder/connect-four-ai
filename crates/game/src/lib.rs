@@ -37,14 +37,14 @@ impl Game {
 	/// result.
 	pub fn run(&mut self) -> Result<GameResult, Error> {
 		loop {
-			let move_x = self.player_x.make_move(&self.board);
+			let move_x = self.player_x.make_move(&self.board, Team::X);
 			self.board.put_tile(move_x, Team::X)?;
 
 			if let Some(result) = self.board.game_result() {
 				return Ok(result);
 			}
 
-			let move_o = self.player_o.make_move(&self.board);
+			let move_o = self.player_o.make_move(&self.board, Team::O);
 			self.board.put_tile(move_o, Team::O)?;
 
 			if let Some(result) = self.board.game_result() {

@@ -159,6 +159,68 @@ impl Board {
 
 		Err(Error::FieldFullAtColumn)
 	}
+
+	/// Heuristic function to evaluate the board's position. Returns 0.0 for an
+	/// estimated draw, above that for estimated wins and below for estimated
+	/// losses.
+	#[must_use]
+	#[allow(clippy::cast_possible_wrap)] // The board isn't that wide, there is no wraps.
+	pub fn heuristic_1(&self, me: Team) -> f64 {
+		match self.game_result() {
+			Some(GameResult::Draw) => return 0.0,
+			Some(GameResult::Winner(team)) => return if team == me { f64::MAX } else { f64::MIN },
+			None => {}
+		}
+
+		let mut value = 0.0;
+		for x in 0..W {
+			for y in 0..H {
+				if let Some(team) = self.field[x * H + y] {
+					let mut surrounding = 0.0;
+					for (displace_x, displace_y) in [
+						(1, 0),
+						(1, 1),
+						(0, 1),
+						(-1, 1),
+						(-1, 0),
+						(-1_i32, -1_i32),
+						(0, -1),
+						(1, -1),
+					] {
+						if let Some(field) = self.field.get(
+							(x as i32 + displace_x)
+								.saturating_mul(H as i32)
+								.saturating_add(y as i32 + displace_y) as usize,
+						) {
+							match field {
+								None => surrounding += 0.333,
+								Some(t) if *t == team => surrounding += 1.0,
+								_ => surrounding -= 1.0,
+							}
+						}
+					}
+					if team == me {
+						value += surrounding;
+					} else {
+						value -= surrounding;
+					}
+				}
+			}
+		}
+
+		value
+	}
+}
+
+impl Team {
+	/// Get the other team.
+	#[must_use]
+	pub fn other(&self) -> Self {
+		match self {
+			Self::X => Self::O,
+			Self::O => Self::X,
+		}
+	}
 }
 
 impl Display for Board {

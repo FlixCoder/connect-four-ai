@@ -2,14 +2,14 @@
 
 use std::io::Write;
 
-use game::{Board, Player};
+use game::{Board, Player, Team};
 
 /// Terminal IO player.
 #[derive(Debug)]
 pub struct IoPlayer;
 
 impl Player for IoPlayer {
-	fn make_move(&self, board: &Board) -> usize {
+	fn make_move(&self, board: &Board, _me: Team) -> usize {
 		println!("Current board:\n{board}");
 		println!("0 | 1 | 2 | 3 | 4 | 5 | 6 \n");
 
