@@ -1,4 +1,5 @@
 //! Terminal IO player.
+#![allow(clippy::print_stdout)]
 
 use std::io::Write;
 

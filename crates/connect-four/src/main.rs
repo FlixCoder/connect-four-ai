@@ -1,11 +1,16 @@
 //! Connect four CLI game implementation.
 #![allow(clippy::print_stdout, clippy::expect_used)]
 
-use connect_four::players::{IoPlayer, MinimaxPlayer};
+use std::sync::Arc;
+
 use game::{Error, Game, GameResult};
+use players::{IoPlayer, MinimaxPlayer};
 
 fn main() -> Result<(), Error> {
-	let mut game = Game::builder().player_x(IoPlayer).player_o(MinimaxPlayer::new_1(7)).build()?;
+	let mut game = Game::builder()
+		.player_x(Arc::new(IoPlayer))
+		.player_o(Arc::new(MinimaxPlayer::new_1(7)))
+		.build();
 	let result = game.run()?;
 
 	match result {

@@ -1,8 +1,8 @@
 [package]
-name = "game"
+name = "players"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-thiserror = "1.0.49"
-typed-builder = "0.16.2"
+game = { path = "../game" }
+rand = "0.8.5"

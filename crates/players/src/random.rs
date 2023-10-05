@@ -1,4 +1,4 @@
-//! Random player.
+//! Random player implementation.
 
 use game::{Board, Player, Team};
 use rand::{seq::IteratorRandom, thread_rng};

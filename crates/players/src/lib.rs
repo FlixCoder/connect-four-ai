@@ -1,4 +1,5 @@
 //! Connect four game player implementations.
+#![allow(clippy::expect_used)]
 
 mod io;
 mod minimax;

@@ -2,13 +2,11 @@
 //! simulate or run games.
 
 mod board;
-mod builder;
 mod error;
 mod player;
 
 use std::sync::Arc;
 
-use self::builder::GameBuilder;
 pub use self::{
 	board::{Board, GameResult, Team},
 	error::Error,
@@ -16,9 +14,10 @@ pub use self::{
 };
 
 /// An instance of a connect four game.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, typed_builder::TypedBuilder)]
 pub struct Game {
 	/// Game board.
+	#[builder(setter(skip), default)]
 	board: Board,
 	/// Player for team X, starting player.
 	player_x: Arc<dyn Player>,
@@ -27,12 +26,6 @@ pub struct Game {
 }
 
 impl Game {
-	/// Start building a game.
-	#[must_use]
-	pub fn builder() -> GameBuilder {
-		GameBuilder::default()
-	}
-
 	/// Run the game to completion using the players as actors. Returns the game
 	/// result.
 	pub fn run(&mut self) -> Result<GameResult, Error> {

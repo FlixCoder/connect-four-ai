@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use game::{Board, GameResult, Player, Team};
 
 /// Type for heuristic function.
-type HeuristicFn = Box<dyn Fn(&Board, Team) -> f64>;
+type HeuristicFn = Box<dyn Fn(&Board, Team) -> f64 + Send + Sync>;
 
 /// Minimax player with a custom heuristic.
 pub struct MinimaxPlayer {
@@ -21,7 +21,7 @@ impl MinimaxPlayer {
 	/// Create new minimax player with custom heuristic.
 	fn new<H>(deepness: usize, heuristic: H) -> Self
 	where
-		H: Fn(&Board, Team) -> f64 + 'static,
+		H: Fn(&Board, Team) -> f64 + Send + Sync + 'static,
 	{
 		Self { deepness, heuristic: Box::new(heuristic) }
 	}
