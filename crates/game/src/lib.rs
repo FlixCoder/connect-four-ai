@@ -5,8 +5,6 @@ mod board;
 mod error;
 mod player;
 
-use std::sync::Arc;
-
 pub use self::{
 	board::{Board, GameResult, Team},
 	error::Error,
@@ -15,17 +13,23 @@ pub use self::{
 
 /// An instance of a connect four game.
 #[derive(Debug, Clone, typed_builder::TypedBuilder)]
-pub struct Game {
+pub struct Game<'a> {
 	/// Game board.
 	#[builder(setter(skip), default)]
 	board: Board,
 	/// Player for team X, starting player.
-	player_x: Arc<dyn Player>,
+	player_x: &'a dyn Player,
 	/// Player for team O, second player.
-	player_o: Arc<dyn Player>,
+	player_o: &'a dyn Player,
 }
 
-impl Game {
+impl<'a> Game<'a> {
+	/// Return the current board position.
+	#[must_use]
+	pub fn board(&self) -> &Board {
+		&self.board
+	}
+
 	/// Run the game to completion using the players as actors. Returns the game
 	/// result.
 	pub fn run(&mut self) -> Result<GameResult, Error> {

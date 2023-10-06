@@ -49,6 +49,18 @@ impl Default for Board {
 }
 
 impl Board {
+	/// Get the dimensions of the board. Returns (Widht, Height).
+	#[must_use]
+	pub fn dimensions(&self) -> (usize, usize) {
+		(W, H)
+	}
+
+	/// Get access to the raw underlying board data.
+	#[must_use]
+	pub fn field(&self) -> &[Option<Team>] {
+		&self.field
+	}
+
 	/// Get current state of the board, returning whether there is a result and
 	/// if so, who won. Returns unpredictable results if there are multiple
 	/// winners at once, as this can only happen when multiple turns are done
