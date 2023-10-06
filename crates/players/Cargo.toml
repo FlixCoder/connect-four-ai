@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-burn = { version = "0.9.0", features = ["ndarray", "wgpu"] }
-game = { path = "../game" }
-rand = "0.8.5"
-serde = "1.0.188"
+burn = { workspace = true }
+game = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }

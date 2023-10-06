@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-thiserror = "1.0.49"
-typed-builder = "0.16.2"
+thiserror = { workspace = true }
+typed-builder = { workspace = true }

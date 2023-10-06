@@ -15,7 +15,7 @@ use burn::{
 };
 use game::{Board, Player, Team};
 
-use crate::{ModifyMapper, RandomPlayer};
+use crate::RandomPlayer;
 
 /// Convolutional neural network model to choose a connect four column. Model
 /// and player at once.
@@ -23,14 +23,10 @@ use crate::{ModifyMapper, RandomPlayer};
 pub struct ModelPlayer<B: Backend> {
 	/// Conv layer 1.
 	conv1: Conv2d<B>,
-	/// Conv layer 2.
-	conv2: Conv2d<B>,
 	/// Pooling layer.
 	pool: AdaptiveAvgPool2d,
 	/// Linear layer 1.
 	linear1: Linear<B>,
-	/// Linear layer 2.
-	linear2: Linear<B>,
 	/// Activation.
 	activation: ReLU,
 }
@@ -40,23 +36,12 @@ impl<B: Backend> ModelPlayer<B> {
 	#[must_use]
 	pub fn init() -> Self {
 		Self {
-			conv1: Conv2dConfig::new([1, 6], [3, 3]).init(),
-			conv2: Conv2dConfig::new([6, 10], [4, 4]).init(),
-			pool: AdaptiveAvgPool2dConfig::new([4, 4]).init(),
-			linear1: LinearConfig::new(10 * 4 * 4, 80).init(),
-			linear2: LinearConfig::new(80, 7).init(),
+			conv1: Conv2dConfig::new([1, 8], [4, 4]).init(),
+			pool: AdaptiveAvgPool2dConfig::new([6, 7]).init(),
+			linear1: LinearConfig::new(8 * 6 * 7, 7).init(),
 			activation: ReLU::new(),
 		}
 		.no_grad()
-	}
-
-	/// Modify the model with a random variation tensor.
-	#[must_use]
-	pub fn modify(self, parameters: Tensor<B, 1>) -> Self {
-		let mut mapper = ModifyMapper { parameters, used: 0 };
-		let this = self.map(&mut mapper);
-		mapper.verify();
-		this
 	}
 
 	/// Load the module from a file.
@@ -75,13 +60,10 @@ impl<B: Backend> ModelPlayer<B> {
 		let [batch, height, width] = field.dims();
 		let data = field.reshape([batch, 1, height, width]);
 		let data = self.conv1.forward(data);
-		let data = self.conv2.forward(data);
 		let data = self.activation.forward(data);
 		let data = self.pool.forward(data);
-		let data = data.reshape([batch, 10 * 4 * 4]);
+		let data = data.reshape([batch, 8 * 6 * 7]);
 		let data = self.linear1.forward(data);
-		let data = self.activation.forward(data);
-		let data = self.linear2.forward(data);
 		softmax(data, 1)
 	}
 
