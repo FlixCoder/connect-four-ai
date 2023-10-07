@@ -1,28 +1,29 @@
 //! Connect four agent training implementation.
 #![allow(clippy::print_stdout, clippy::expect_used)]
 
+pub mod evaluation;
 pub mod optimizers;
 mod utils;
 
-use std::{fmt::Debug, marker::PhantomData, sync::Mutex};
+use std::{fmt::Debug, marker::PhantomData};
 
 use burn::{
 	module::Module,
 	tensor::{backend::Backend, Tensor},
 };
-use game::{Game, GameResult, Player, Team};
+use game::Player;
 use rand::{rngs::StdRng, SeedableRng};
 use rand_distr::Distribution;
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 use self::{optimizers::Optimizer, utils::ModifyMapper};
 
 /// The model trainer.
 #[derive(Debug, typed_builder::TypedBuilder)]
-pub struct Trainer<B, Model, Opt>
+pub struct Trainer<B, Model, Eval, Opt>
 where
 	B: Backend + Debug,
 	Model: Module<B> + Player + Debug,
+	Eval: FnMut(&[Model]) -> Vec<f32>,
 	Opt: Optimizer<B> + Debug,
 {
 	/// The model to train.
@@ -34,14 +35,17 @@ where
 	std: f32,
 	/// The double-sided sample/population size.
 	samples: usize,
+	/// Evaluation function to compute the scores of a population.
+	evaluator: Eval,
 	/// The optimizer to use.
 	optimizer: Opt,
 }
 
-impl<B, Model, Opt> Trainer<B, Model, Opt>
+impl<B, Model, Eval, Opt> Trainer<B, Model, Eval, Opt>
 where
 	B: Backend + Debug,
 	Model: Module<B> + Player + Debug,
+	Eval: FnMut(&[Model]) -> Vec<f32>,
 	Opt: Optimizer<B> + Debug,
 {
 	/// Get the optimizer.
@@ -79,38 +83,10 @@ where
 		let mut population = Vec::with_capacity(self.samples * 2);
 		for i in 0..self.samples {
 			let disposition = self.generate_model_params(seed, i);
-			population.push(self.modified_model(disposition.clone().mul_scalar(-1)));
-			population.push(self.modified_model(disposition));
+			population.push(self.modified_model(disposition.clone()));
+			population.push(self.modified_model(disposition.mul_scalar(-1)));
 		}
 		population
-	}
-
-	/// Run games between each of the leagues participants and return their
-	/// scores.
-	fn league_scores(models: &[Model]) -> Vec<f32> {
-		let mut matchups = Vec::new();
-		for i in 0..models.len() {
-			for j in i..models.len() {
-				matchups.push((i, j));
-			}
-		}
-
-		let scores = Mutex::new(vec![0.0; models.len()]);
-		matchups.into_par_iter().for_each(|(i, j)| {
-			let mut game = Game::builder().player_x(&models[i]).player_o(&models[j]).build();
-			let result = game.run().expect("running game");
-			if let GameResult::Winner(winner) = result {
-				let mut scores = scores.lock().expect("lock poisened");
-				if winner == Team::X {
-					scores[i] += 1.0;
-					scores[j] -= 1.0;
-				} else {
-					scores[i] -= 1.0;
-					scores[j] += 1.0;
-				}
-			}
-		});
-		scores.into_inner().expect("lock poisened")
 	}
 
 	/// Compute the gradient from the scores. Generates the same dispositions as
@@ -119,7 +95,7 @@ where
 		let mut gradient = Tensor::zeros([self.model.num_params()]);
 		for i in 0..self.samples {
 			let disposition = self.generate_model_params(seed, i);
-			gradient = gradient + disposition.mul_scalar(scores[i * 2 + 1] - scores[i * 2]);
+			gradient = gradient + disposition.mul_scalar(scores[i * 2] - scores[i * 2 + 1]);
 		}
 		gradient.mul_scalar(1.0 / (2.0 * self.samples as f32 * self.std))
 	}
@@ -128,7 +104,7 @@ where
 	pub fn train_step(&mut self) -> &mut Self {
 		let seed = rand::random();
 		let population = time!(self.generate_population(seed), "Generating population");
-		let mut scores = time!(Self::league_scores(&population), "Computing league scores");
+		let mut scores = time!((self.evaluator)(&population), "Computing population scores");
 		normalize_scores(&mut scores);
 		let gradient = time!(self.compute_gradient(seed, &scores), "Computing gradient");
 		// Invert gradient so that we do descent and not ascent.
