@@ -2,17 +2,35 @@
 
 use std::sync::Mutex;
 
-use burn::{module::Module, tensor::backend::Backend};
 use game::{Game, GameResult, Player, Team};
-use players::RandomPlayer;
+use players::{MinimaxPlayer, RandomPlayer};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+
+/// Evaluator interface that evaluators and evaluation functions implement to
+/// determine performance of the population's models.
+pub trait Evaluator<Model>
+where
+	Model: Player,
+{
+	/// Evaluate a set of models and return their scores in the same order.
+	fn evaluate(&mut self, models: &[Model]) -> Vec<f32>;
+}
+
+impl<Model, F> Evaluator<Model> for F
+where
+	Model: Player,
+	F: FnMut(&[Model]) -> Vec<f32>,
+{
+	fn evaluate(&mut self, models: &[Model]) -> Vec<f32> {
+		(self)(models)
+	}
+}
 
 /// Evaluation function for a set of models. Run games between each of the
 /// leagues participants and return their scores.
-pub fn league_scores<B, Model>(models: &[Model]) -> Vec<f32>
+pub fn league_scores<Model>(models: &[Model]) -> Vec<f32>
 where
-	B: Backend,
-	Model: Module<B> + Player,
+	Model: Player + Send + Sync,
 {
 	let mut matchups = Vec::new();
 	for i in 0..models.len() {
@@ -24,7 +42,7 @@ where
 	let scores = Mutex::new(vec![0.0; models.len()]);
 	matchups.into_par_iter().for_each(|(i, j)| {
 		let mut game = Game::builder().player_x(&models[i]).player_o(&models[j]).build();
-		let result = game.run().expect("running game");
+		let result = game.run_error_loss();
 		if let GameResult::Winner(winner) = result {
 			let mut scores = scores.lock().expect("lock poisened");
 			if winner == Team::X {
@@ -40,38 +58,128 @@ where
 }
 
 /// Evaluation function for a set of models. Run games against the random
-/// player.
-pub fn random_player_scores<B, Model>(models: &[Model]) -> Vec<f32>
+/// player and the minimax player.
+pub fn player_scores<Model>(models: &[Model]) -> Vec<f32>
 where
-	B: Backend,
-	Model: Module<B> + Player,
+	Model: Player + Send + Sync,
 {
 	models
 		.par_iter()
-		.map(|model| {
-			let mut score = 0.0;
-
-			for _ in 0..500 {
-				let mut game = Game::builder().player_x(&RandomPlayer).player_o(model).build();
-				let result = game.run().expect("running game");
-				match result {
-					GameResult::Winner(Team::X) => score -= 1.0,
-					GameResult::Winner(Team::O) => score += 1.0,
-					_ => {}
-				}
-			}
-
-			for _ in 0..500 {
-				let mut game = Game::builder().player_x(model).player_o(&RandomPlayer).build();
-				let result = game.run().expect("running game");
-				match result {
-					GameResult::Winner(Team::X) => score += 1.0,
-					GameResult::Winner(Team::O) => score -= 1.0,
-					_ => {}
-				}
-			}
-
-			score / 1000.0
-		})
+		.map(|model| test_random::<_, 1000>(model) + test_minimax::<_, 5>(model))
 		.collect()
+}
+
+/// Evaluator for a set of models. Run games against a random player, minimax
+/// player and a set of previous models.
+#[derive(Debug, Default)]
+pub struct PlayerPlusEvaluator<Model>
+where
+	Model: Player + Send + Sync,
+{
+	/// Set of previous models to also test against.
+	previous: Vec<Model>,
+}
+
+impl<Model> Evaluator<Model> for PlayerPlusEvaluator<Model>
+where
+	Model: Player + Send + Sync,
+{
+	fn evaluate(&mut self, models: &[Model]) -> Vec<f32> {
+		models
+			.par_iter()
+			.map(|model| {
+				let mut previous_score = 0.0;
+				for previous in &self.previous {
+					let mut game = Game::builder().player_x(model).player_o(previous).build();
+					let result = game.run_error_loss();
+					match result {
+						GameResult::Winner(Team::X) => previous_score += 1.0,
+						GameResult::Winner(Team::O) => previous_score -= 1.0,
+						_ => {}
+					}
+
+					let mut game = Game::builder().player_x(previous).player_o(model).build();
+					let result = game.run_error_loss();
+					match result {
+						GameResult::Winner(Team::X) => previous_score -= 1.0,
+						GameResult::Winner(Team::O) => previous_score += 1.0,
+						_ => {}
+					}
+				}
+				previous_score /= (self.previous.len() * 2) as f32;
+
+				test_random::<_, 1000>(model) + test_minimax::<_, 5>(model) + previous_score
+			})
+			.collect()
+	}
+}
+
+impl<Model> PlayerPlusEvaluator<Model>
+where
+	Model: Player + Send + Sync,
+{
+	/// Add a "previous" model to the set so that it is used in evaluation.
+	pub fn add_model(&mut self, model: Model) -> &mut Self {
+		self.previous.push(model);
+		self
+	}
+
+	// TODO: Load and save..
+}
+
+/// Test the performance of the model against the random player.
+pub fn test_random<Model, const N: usize>(model: &Model) -> f32
+where
+	Model: Player,
+{
+	let mut score = 0.0;
+
+	for _ in 0..N / 2 {
+		let mut game = Game::builder().player_x(&RandomPlayer).player_o(model).build();
+		let result = game.run_error_loss();
+		match result {
+			GameResult::Winner(Team::X) => score -= 1.0,
+			GameResult::Winner(Team::O) => score += 1.0,
+			_ => {}
+		}
+	}
+
+	for _ in 0..N / 2 {
+		let mut game = Game::builder().player_x(model).player_o(&RandomPlayer).build();
+		let result = game.run_error_loss();
+		match result {
+			GameResult::Winner(Team::X) => score += 1.0,
+			GameResult::Winner(Team::O) => score -= 1.0,
+			_ => {}
+		}
+	}
+
+	score / N as f32
+}
+
+/// Test performance against the minimax player.
+pub fn test_minimax<Model, const DEEPNESS: usize>(model: &Model) -> f32
+where
+	Model: Player,
+{
+	let mut score = 0.0;
+	let minimax_player = MinimaxPlayer::new_1(DEEPNESS);
+
+	let mut game = Game::builder().player_x(model).player_o(&minimax_player).build();
+	let result = game.run_error_loss();
+	match result {
+		GameResult::Winner(Team::X) => score += 1.0,
+		GameResult::Winner(Team::O) => score -= 1.0,
+		_ => {}
+	}
+
+	let mut game = Game::builder().player_x(&minimax_player).player_o(model).build();
+	let result = game.run_error_loss();
+	match result {
+		GameResult::Winner(Team::X) => score -= 1.0,
+		GameResult::Winner(Team::O) => score += 1.0,
+		_ => {}
+	}
+
+	score / 2.0
 }

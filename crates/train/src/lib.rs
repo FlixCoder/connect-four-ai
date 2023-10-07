@@ -15,7 +15,7 @@ use game::Player;
 use rand::{rngs::StdRng, SeedableRng};
 use rand_distr::Distribution;
 
-use self::{optimizers::Optimizer, utils::ModifyMapper};
+use self::{evaluation::Evaluator, optimizers::Optimizer, utils::ModifyMapper};
 
 /// The model trainer.
 #[derive(Debug, typed_builder::TypedBuilder)]
@@ -23,7 +23,7 @@ pub struct Trainer<B, Model, Eval, Opt>
 where
 	B: Backend + Debug,
 	Model: Module<B> + Player + Debug,
-	Eval: FnMut(&[Model]) -> Vec<f32>,
+	Eval: Evaluator<Model>,
 	Opt: Optimizer<B> + Debug,
 {
 	/// The model to train.
@@ -45,7 +45,7 @@ impl<B, Model, Eval, Opt> Trainer<B, Model, Eval, Opt>
 where
 	B: Backend + Debug,
 	Model: Module<B> + Player + Debug,
-	Eval: FnMut(&[Model]) -> Vec<f32>,
+	Eval: Evaluator<Model>,
 	Opt: Optimizer<B> + Debug,
 {
 	/// Get the optimizer.
@@ -56,6 +56,16 @@ where
 	/// Get the inner model as copy.
 	pub fn model(&self) -> &Model {
 		&self.model
+	}
+
+	/// Get the evaluator.
+	pub fn evaluator(&self) -> &Eval {
+		&self.evaluator
+	}
+
+	/// Get the evaluator mutably.
+	pub fn evaluator_mut(&mut self) -> &mut Eval {
+		&mut self.evaluator
 	}
 
 	/// Get a modified copy of the model.
@@ -104,7 +114,7 @@ where
 	pub fn train_step(&mut self) -> &mut Self {
 		let seed = rand::random();
 		let population = time!(self.generate_population(seed), "Generating population");
-		let mut scores = time!((self.evaluator)(&population), "Computing population scores");
+		let mut scores = time!(self.evaluator.evaluate(&population), "Computing population scores");
 		normalize_scores(&mut scores);
 		let gradient = time!(self.compute_gradient(seed, &scores), "Computing gradient");
 		// Invert gradient so that we do descent and not ascent.
@@ -133,16 +143,4 @@ fn normalize_scores(scores: &mut [f32]) {
 	for score in scores {
 		*score = (*score - mean) / std;
 	}
-}
-
-/// Time a call to a function.
-#[macro_export]
-macro_rules! time {
-	($e: expr, $msg: literal) => {{
-		let now = std::time::Instant::now();
-		let result = $e;
-		let elapsed = now.elapsed();
-		println!(concat!($msg, ": {:?}"), elapsed);
-		result
-	}};
 }

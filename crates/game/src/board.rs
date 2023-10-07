@@ -169,7 +169,7 @@ impl Board {
 			}
 		}
 
-		Err(Error::FieldFullAtColumn)
+		Err(Error::FieldFullAtColumn(team))
 	}
 
 	/// Heuristic function to evaluate the board's position. Returns 0.0 for an

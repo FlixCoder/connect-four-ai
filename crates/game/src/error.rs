@@ -1,5 +1,7 @@
 //! Errors that can appear.
 
+use crate::Team;
+
 /// Game error.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -9,5 +11,5 @@ pub enum Error {
 
 	/// Field already filled at the given column.
 	#[error("Field already full at given column")]
-	FieldFullAtColumn,
+	FieldFullAtColumn(Team),
 }

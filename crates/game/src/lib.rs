@@ -49,4 +49,31 @@ impl<'a> Game<'a> {
 			}
 		}
 	}
+
+	/// Run the game with conversion of player errors to game loss.
+	pub fn run_error_loss(&mut self) -> GameResult {
+		loop {
+			let move_x = self.player_x.make_move(&self.board, Team::X);
+			match self.board.put_tile(move_x, Team::X) {
+				Err(Error::FieldFullAtColumn(team)) => return GameResult::Winner(team.other()),
+				Err(err) => panic!("Player made non-game related error: {err}"),
+				Ok(_) => {}
+			}
+
+			if let Some(result) = self.board.game_result() {
+				return result;
+			}
+
+			let move_o = self.player_o.make_move(&self.board, Team::O);
+			match self.board.put_tile(move_o, Team::O) {
+				Err(Error::FieldFullAtColumn(team)) => return GameResult::Winner(team.other()),
+				Err(err) => panic!("Player made non-game related error: {err}"),
+				Ok(_) => {}
+			}
+
+			if let Some(result) = self.board.game_result() {
+				return result;
+			}
+		}
+	}
 }

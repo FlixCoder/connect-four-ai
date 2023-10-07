@@ -1,9 +1,7 @@
 //! Execute training of the connect four AI.
 #![allow(clippy::print_stdout, clippy::expect_used)]
 
-use burn::tensor::backend::Backend;
-use game::{Game, GameResult, Team};
-use players::{MinimaxPlayer, ModelPlayer, NdArrayBackend, RandomPlayer};
+use players::{ModelPlayer, NdArrayBackend};
 use train::{evaluation::*, optimizers::*, time, Trainer};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,12 +24,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.model(model)
 		.std(0.025)
 		.samples(100)
-		.evaluator(random_player_scores)
+		.evaluator(player_scores)
 		.optimizer(optimizer)
 		.build();
 
 	for i in 0..10000 {
 		time!(trainer.train_step(), "One training step");
+
+		let score = time!(test_random::<_, 1000>(trainer.model()), "Testing performance");
+		println!("Random performance: {score:.3}");
+		let score = test_minimax::<_, 5>(trainer.model());
+		println!("Minimax performance: {score:.1}");
 
 		if i % 10 == 0 {
 			let optimizer = trainer.optimizer();
@@ -41,64 +44,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			println!("Model saved!");
 		}
 
-		let score = time!(test_random(trainer.model()), "Testing performance");
-		println!("Performance score: {score:.3}");
-		let score = test_minimax(trainer.model());
-		println!("Minimax performance: {score:.1}");
-
 		println!();
 	}
 
 	Ok(())
-}
-
-/// Test the performance of the model against the random player.
-fn test_random<B: Backend>(model: &ModelPlayer<B>) -> f32 {
-	let mut score = 0.0;
-
-	for _ in 0..500 {
-		let mut game = Game::builder().player_x(&RandomPlayer).player_o(model).build();
-		let result = game.run().expect("running game");
-		match result {
-			GameResult::Winner(Team::X) => score -= 1.0,
-			GameResult::Winner(Team::O) => score += 1.0,
-			_ => {}
-		}
-	}
-
-	for _ in 0..500 {
-		let mut game = Game::builder().player_x(model).player_o(&RandomPlayer).build();
-		let result = game.run().expect("running game");
-		match result {
-			GameResult::Winner(Team::X) => score += 1.0,
-			GameResult::Winner(Team::O) => score -= 1.0,
-			_ => {}
-		}
-	}
-
-	score / 1000.0
-}
-
-/// Test performance against the minimax player.
-fn test_minimax<B: Backend>(model: &ModelPlayer<B>) -> f32 {
-	let mut score = 0.0;
-	let minimax_player = MinimaxPlayer::new_1(5);
-
-	let mut game = Game::builder().player_x(model).player_o(&minimax_player).build();
-	let result = game.run().expect("running game");
-	match result {
-		GameResult::Winner(Team::X) => score += 1.0,
-		GameResult::Winner(Team::O) => score -= 1.0,
-		_ => {}
-	}
-
-	let mut game = Game::builder().player_x(&minimax_player).player_o(model).build();
-	let result = game.run().expect("running game");
-	match result {
-		GameResult::Winner(Team::X) => score -= 1.0,
-		GameResult::Winner(Team::O) => score += 1.0,
-		_ => {}
-	}
-
-	score / 2.0
 }

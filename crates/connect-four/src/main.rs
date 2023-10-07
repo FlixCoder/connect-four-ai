@@ -1,7 +1,7 @@
 //! Connect four CLI game implementation.
 #![allow(clippy::print_stdout, clippy::expect_used)]
 
-use game::{Game, GameResult};
+use game::{Error, Game, GameResult};
 use players::{IoPlayer, ModelPlayer, NdArrayBackend};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -12,7 +12,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	});
 
 	let mut game = Game::builder().player_x(&IoPlayer).player_o(&ai).build();
-	let result = game.run()?;
+	let result = match game.run() {
+		Ok(res) => res,
+		Err(Error::FieldFullAtColumn(team)) => {
+			println!("Player {team:?} made a mistake! Player {:?} won!", team.other());
+			return Ok(());
+		}
+		r => r?,
+	};
 
 	println!("{}", game.board());
 	match result {

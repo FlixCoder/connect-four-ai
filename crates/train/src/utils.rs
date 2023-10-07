@@ -37,3 +37,15 @@ impl<B: Backend> ModuleMapper<B> for ModifyMapper<B> {
 		tensor.add(params)
 	}
 }
+
+/// Time a call to a function.
+#[macro_export]
+macro_rules! time {
+	($e: expr, $msg: literal) => {{
+		let now = std::time::Instant::now();
+		let result = $e;
+		let elapsed = now.elapsed();
+		println!(concat!($msg, ": {:?}"), elapsed);
+		result
+	}};
+}

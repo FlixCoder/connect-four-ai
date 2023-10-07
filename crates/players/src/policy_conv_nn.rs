@@ -15,18 +15,22 @@ use burn::{
 };
 use game::{Board, Player, Team};
 
-use crate::RandomPlayer;
-
 /// Convolutional neural network model to choose a connect four column. Model
 /// and player at once.
 #[derive(Debug, Module)]
 pub struct ModelPlayer<B: Backend> {
 	/// Conv layer 1.
 	conv1: Conv2d<B>,
+	/// Conv layer 2.
+	conv2: Conv2d<B>,
 	/// Pooling layer.
 	pool: AdaptiveAvgPool2d,
 	/// Linear layer 1.
 	linear1: Linear<B>,
+	/// Linear layer 2.
+	linear2: Linear<B>,
+	/// Linear layer 3.
+	linear3: Linear<B>,
 	/// Activation.
 	activation: ReLU,
 }
@@ -36,9 +40,12 @@ impl<B: Backend> ModelPlayer<B> {
 	#[must_use]
 	pub fn init() -> Self {
 		Self {
-			conv1: Conv2dConfig::new([1, 8], [4, 4]).init(),
+			conv1: Conv2dConfig::new([1, 4], [4, 4]).init(),
+			conv2: Conv2dConfig::new([4, 8], [4, 4]).init(),
 			pool: AdaptiveAvgPool2dConfig::new([6, 7]).init(),
-			linear1: LinearConfig::new(8 * 6 * 7, 7).init(),
+			linear1: LinearConfig::new(8 * 6 * 7, 150).init(),
+			linear2: LinearConfig::new(150, 75).init(),
+			linear3: LinearConfig::new(75, 7).init(),
 			activation: ReLU::new(),
 		}
 		.no_grad()
@@ -61,9 +68,15 @@ impl<B: Backend> ModelPlayer<B> {
 		let data = field.reshape([batch, 1, height, width]);
 		let data = self.conv1.forward(data);
 		let data = self.activation.forward(data);
+		let data = self.conv2.forward(data);
+		let data = self.activation.forward(data);
 		let data = self.pool.forward(data);
 		let data = data.reshape([batch, 8 * 6 * 7]);
 		let data = self.linear1.forward(data);
+		let data = self.activation.forward(data);
+		let data = self.linear2.forward(data);
+		let data = self.activation.forward(data);
+		let data = self.linear3.forward(data);
 		softmax(data, 1)
 	}
 
@@ -94,12 +107,6 @@ impl<B: Backend> ModelPlayer<B> {
 
 impl<B: Backend> Player for ModelPlayer<B> {
 	fn make_move(&self, board: &Board, me: Team) -> usize {
-		let column = self.predict(board, me);
-		let possible_moves = board.possible_moves();
-		if possible_moves.contains(&column) {
-			column
-		} else {
-			RandomPlayer.make_move(board, me)
-		}
+		self.predict(board, me)
 	}
 }
