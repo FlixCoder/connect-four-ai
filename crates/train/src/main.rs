@@ -4,7 +4,7 @@
 use burn::tensor::backend::Backend;
 use game::{Game, GameResult, Team};
 use players::{MinimaxPlayer, ModelPlayer, NdArrayBackend, RandomPlayer};
-use train::{evaluation::league_scores, optimizers::Sgd, time, Trainer};
+use train::{evaluation::*, optimizers::*, time, Trainer};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let model_path = "model";
@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.model(model)
 		.std(0.025)
 		.samples(100)
-		.evaluator(league_scores)
+		.evaluator(random_player_scores)
 		.optimizer(optimizer)
 		.build();
 
