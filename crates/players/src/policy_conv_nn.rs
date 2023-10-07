@@ -7,8 +7,7 @@ use burn::{
 	module::Module,
 	nn::{
 		conv::{Conv2d, Conv2dConfig},
-		pool::{AdaptiveAvgPool2d, AdaptiveAvgPool2dConfig},
-		Linear, LinearConfig, ReLU,
+		Linear, LinearConfig, GELU,
 	},
 	record::{FullPrecisionSettings, NamedMpkGzFileRecorder},
 	tensor::{activation::softmax, backend::Backend, ElementConversion, Tensor},
@@ -21,10 +20,6 @@ use game::{Board, Player, Team};
 pub struct ModelPlayer<B: Backend> {
 	/// Conv layer 1.
 	conv1: Conv2d<B>,
-	/// Conv layer 2.
-	conv2: Conv2d<B>,
-	/// Pooling layer.
-	pool: AdaptiveAvgPool2d,
 	/// Linear layer 1.
 	linear1: Linear<B>,
 	/// Linear layer 2.
@@ -32,7 +27,7 @@ pub struct ModelPlayer<B: Backend> {
 	/// Linear layer 3.
 	linear3: Linear<B>,
 	/// Activation.
-	activation: ReLU,
+	activation: GELU,
 }
 
 impl<B: Backend> ModelPlayer<B> {
@@ -40,13 +35,11 @@ impl<B: Backend> ModelPlayer<B> {
 	#[must_use]
 	pub fn init() -> Self {
 		Self {
-			conv1: Conv2dConfig::new([1, 4], [4, 4]).init(),
-			conv2: Conv2dConfig::new([4, 8], [4, 4]).init(),
-			pool: AdaptiveAvgPool2dConfig::new([6, 7]).init(),
-			linear1: LinearConfig::new(8 * 6 * 7, 150).init(),
-			linear2: LinearConfig::new(150, 75).init(),
-			linear3: LinearConfig::new(75, 7).init(),
-			activation: ReLU::new(),
+			conv1: Conv2dConfig::new([1, 8], [4, 4]).init(),
+			linear1: LinearConfig::new(8 * 3 * 4, 100).init(), // 4x4 kernel makes 6x7 to 3x4.
+			linear2: LinearConfig::new(100, 50).init(),
+			linear3: LinearConfig::new(50, 7).init(),
+			activation: GELU::new(),
 		}
 		.no_grad()
 	}
@@ -68,10 +61,8 @@ impl<B: Backend> ModelPlayer<B> {
 		let data = field.reshape([batch, 1, height, width]);
 		let data = self.conv1.forward(data);
 		let data = self.activation.forward(data);
-		let data = self.conv2.forward(data);
-		let data = self.activation.forward(data);
-		let data = self.pool.forward(data);
-		let data = data.reshape([batch, 8 * 6 * 7]);
+		let [batch, channels, height, width] = data.dims();
+		let data = data.reshape([batch, channels * height * width]);
 		let data = self.linear1.forward(data);
 		let data = self.activation.forward(data);
 		let data = self.linear2.forward(data);
