@@ -169,6 +169,8 @@ where
 	population_max: usize,
 	/// Minimum population size to select.
 	population_min: usize,
+	/// Probability to generate a new model.
+	generate_new: f64,
 	/// Probability of mutation.
 	mutation_probability: f64,
 	/// Mutation range standard deviation.
@@ -240,7 +242,7 @@ where
 		}
 
 		while self.population.len() < self.population_max {
-			if rng.gen::<f64>() < 0.1 {
+			if rng.gen::<f64>() < self.generate_new {
 				self.population.push((self.init_fn)());
 			} else {
 				let selected = self.population.choose_multiple(&mut rng, 2).collect::<Vec<_>>();
@@ -284,6 +286,7 @@ where
 			.field("init_fn", &"<function to initialize model>")
 			.field("population_max", &self.population_max)
 			.field("population_min", &self.population_min)
+			.field("generate_new", &self.generate_new)
 			.field("mutation_probability", &self.mutation_probability)
 			.field("mutation_std", &self.mutation_std)
 			.field("evaluator", &self.evaluator)
