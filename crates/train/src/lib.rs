@@ -169,6 +169,8 @@ where
 	population_max: usize,
 	/// Minimum population size to select.
 	population_min: usize,
+	/// Probability of mutation.
+	mutation_probability: f64,
 	/// Mutation range standard deviation.
 	mutation_std: f64,
 	/// Evaluation function to compute the scores of a population.
@@ -243,7 +245,7 @@ where
 			} else {
 				let selected = self.population.choose_multiple(&mut rng, 2).collect::<Vec<_>>();
 				let mut model = Self::breed(selected[0], selected[1]);
-				if rng.gen::<f64>() < 0.95 {
+				if rng.gen::<f64>() < self.mutation_probability {
 					model = self.mutate(model);
 				}
 				self.population.push(model);
@@ -282,6 +284,7 @@ where
 			.field("init_fn", &"<function to initialize model>")
 			.field("population_max", &self.population_max)
 			.field("population_min", &self.population_min)
+			.field("mutation_probability", &self.mutation_probability)
 			.field("mutation_std", &self.mutation_std)
 			.field("evaluator", &self.evaluator)
 			.finish()

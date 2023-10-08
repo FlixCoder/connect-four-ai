@@ -16,8 +16,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.init_fn(Box::new(ModelPlayer::init))
 		.evaluator(PlayerPlusEvaluator::default())
 		.population_max(200)
-		.population_min(20)
-		.mutation_std(0.05)
+		.population_min(15)
+		.mutation_probability(0.5)
+		.mutation_std(0.02)
 		.build();
 
 	for i in 0..10000 {
