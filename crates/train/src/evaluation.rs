@@ -71,10 +71,10 @@ where
 
 /// Evaluator for a set of models. Run games against a random player, minimax
 /// player and a set of previous models.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct PlayerPlusEvaluator<Model>
 where
-	Model: Player + Send + Sync,
+	Model: Player + Clone + Send + Sync,
 {
 	/// Set of previous models to also test against.
 	previous: Vec<Model>,
@@ -82,10 +82,10 @@ where
 
 impl<Model> Evaluator<Model> for PlayerPlusEvaluator<Model>
 where
-	Model: Player + Send + Sync,
+	Model: Player + Clone + Send + Sync,
 {
 	fn evaluate(&mut self, models: &[Model]) -> Vec<f32> {
-		models
+		let scores = models
 			.par_iter()
 			.map(|model| {
 				let mut previous_score = 0.0;
@@ -106,18 +106,46 @@ where
 						_ => {}
 					}
 				}
-				previous_score /= (self.previous.len() * 2) as f32;
+				if !self.previous.is_empty() {
+					previous_score /= (self.previous.len() * 2) as f32;
+				}
 
 				test_random::<_, 1000>(model) + test_minimax::<_, 5>(model) + previous_score
 			})
-			.collect()
+			.collect::<Vec<_>>();
+
+		if let Some((max_index, _max)) = scores
+			.iter()
+			.enumerate()
+			.max_by(|(_, a), (_, b)| a.partial_cmp(b).expect("Score was NaN"))
+		{
+			self.previous.push(models[max_index].clone());
+		}
+
+		scores
+	}
+}
+
+impl<Model> Default for PlayerPlusEvaluator<Model>
+where
+	Model: Player + Clone + Send + Sync,
+{
+	fn default() -> Self {
+		Self { previous: Vec::new() }
 	}
 }
 
 impl<Model> PlayerPlusEvaluator<Model>
 where
-	Model: Player + Send + Sync,
+	Model: Player + Clone + Send + Sync,
 {
+	/// Add a "previous" model to the set so that it is used in evaluation.
+	#[must_use]
+	pub fn with_model(mut self, model: Model) -> Self {
+		self.previous.push(model);
+		self
+	}
+
 	/// Add a "previous" model to the set so that it is used in evaluation.
 	pub fn add_model(&mut self, model: Model) -> &mut Self {
 		self.previous.push(model);

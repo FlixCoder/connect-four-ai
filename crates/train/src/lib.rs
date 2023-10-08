@@ -9,28 +9,32 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use burn::{
 	module::Module,
-	tensor::{backend::Backend, Tensor},
+	tensor::{backend::Backend, ElementConversion, Tensor},
 };
 use game::Player;
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
 use rand_distr::Distribution;
 
-use self::{evaluation::Evaluator, optimizers::Optimizer, utils::ModifyMapper};
+use self::{
+	evaluation::Evaluator,
+	optimizers::Optimizer,
+	utils::{FlattenVisitor, ModifyMapper, OverrideMapper},
+};
 
-/// The model trainer.
+/// The model trainer using evolution strategy optimization.
 #[derive(Debug, typed_builder::TypedBuilder)]
-pub struct Trainer<B, Model, Eval, Opt>
+pub struct EsTrainer<B, Model, Eval, Opt>
 where
 	B: Backend + Debug,
 	Model: Module<B> + Player + Debug,
 	Eval: Evaluator<Model>,
 	Opt: Optimizer<B> + Debug,
 {
-	/// The model to train.
-	model: Model,
 	/// The backend to use for tensors.
 	#[builder(setter(skip), default)]
 	backend: PhantomData<B>,
+	/// The model to train.
+	model: Model,
 	/// Standard deviation to use for sampling while training.
 	std: f32,
 	/// The double-sided sample/population size.
@@ -41,7 +45,7 @@ where
 	optimizer: Opt,
 }
 
-impl<B, Model, Eval, Opt> Trainer<B, Model, Eval, Opt>
+impl<B, Model, Eval, Opt> EsTrainer<B, Model, Eval, Opt>
 where
 	B: Backend + Debug,
 	Model: Module<B> + Player + Debug,
@@ -142,5 +146,144 @@ fn normalize_scores(scores: &mut [f32]) {
 
 	for score in scores {
 		*score = (*score - mean) / std;
+	}
+}
+
+/// The model trainer using pure evolution with breeding, mutation and
+/// selection.
+#[derive(typed_builder::TypedBuilder)]
+pub struct EvolutionTrainer<B, Model, Eval>
+where
+	B: Backend + Debug,
+	Model: Module<B> + Player + Debug,
+	Eval: Evaluator<Model>,
+{
+	/// The backend to use for tensors.
+	#[builder(setter(skip), default)]
+	backend: PhantomData<B>,
+	/// The population to use for training.
+	population: Vec<Model>,
+	/// Function to initialize a new fresh model.
+	init_fn: Box<dyn FnMut() -> Model>,
+	/// Maximum population size to generate.
+	population_max: usize,
+	/// Minimum population size to select.
+	population_min: usize,
+	/// Mutation range standard deviation.
+	mutation_std: f64,
+	/// Evaluation function to compute the scores of a population.
+	evaluator: Eval,
+}
+
+impl<B, Model, Eval> EvolutionTrainer<B, Model, Eval>
+where
+	B: Backend + Debug,
+	Model: Module<B> + Player + Debug,
+	Eval: Evaluator<Model>,
+{
+	/// Get the population.
+	pub fn population(&self) -> &[Model] {
+		&self.population
+	}
+
+	/// Get the evaluator.
+	pub fn evaluator(&self) -> &Eval {
+		&self.evaluator
+	}
+
+	/// Get the evaluator mutably.
+	pub fn evaluator_mut(&mut self) -> &mut Eval {
+		&mut self.evaluator
+	}
+
+	/// Breed a new model from 2 parent models.
+	pub fn breed(a: &Model, b: &Model) -> Model {
+		let mut visitor_a = FlattenVisitor { parameters: None };
+		a.visit(&mut visitor_a);
+		let params_a = visitor_a.parameters.expect("Model should not be empty");
+		let mut visitor_b = FlattenVisitor { parameters: None };
+		b.visit(&mut visitor_b);
+		let params_b = visitor_b.parameters.expect("Model should not be empty");
+
+		let mask = Tensor::random(
+			[a.num_params()],
+			burn::tensor::Distribution::Uniform(0.0.elem(), 1.0.elem()),
+		);
+		let parameters = mask.clone() * params_a + mask.mul_scalar(-1.0).add_scalar(1.0) * params_b;
+
+		let mut setter = OverrideMapper { parameters, used: 0 };
+		let child = a.clone().map(&mut setter);
+		setter.verify();
+		child
+	}
+
+	/// Mutate a model with random permutations.
+	pub fn mutate(&self, model: Model) -> Model {
+		let parameters = Tensor::random(
+			[model.num_params()],
+			burn::tensor::Distribution::Normal(0.0, self.mutation_std),
+		);
+		let mut mapper = ModifyMapper { parameters, used: 0 };
+		let model = model.map(&mut mapper);
+		mapper.verify();
+		model
+	}
+
+	/// Generate population via breeding and mutation.
+	pub fn generate_population(&mut self) {
+		let mut rng = thread_rng();
+
+		while self.population.len() < self.population_min {
+			self.population.push((self.init_fn)());
+		}
+
+		while self.population.len() < self.population_max {
+			if rng.gen::<f64>() < 0.1 {
+				self.population.push((self.init_fn)());
+			} else {
+				let selected = self.population.choose_multiple(&mut rng, 2).collect::<Vec<_>>();
+				let mut model = Self::breed(selected[0], selected[1]);
+				if rng.gen::<f64>() < 0.95 {
+					model = self.mutate(model);
+				}
+				self.population.push(model);
+			}
+		}
+	}
+
+	/// Train for one step.
+	pub fn train_step(&mut self) -> &mut Self {
+		time!(self.generate_population(), "Generating population");
+		let scores =
+			time!(self.evaluator.evaluate(&self.population), "Computing population scores");
+
+		// Sort population by scores and select the best.
+		let mut population_scores = self.population.drain(..).zip(scores).collect::<Vec<_>>();
+		population_scores
+			.sort_unstable_by(|(_, a), (_, b)| b.partial_cmp(a).expect("Score was NaN"));
+		self.population.append(
+			&mut population_scores.into_iter().take(self.population_min).map(|(m, _)| m).collect(),
+		);
+
+		self
+	}
+}
+
+impl<B, Model, Eval> Debug for EvolutionTrainer<B, Model, Eval>
+where
+	B: Backend + Debug,
+	Model: Module<B> + Player + Debug,
+	Eval: Evaluator<Model> + Debug,
+{
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("EvolutionTrainer")
+			.field("backend", &self.backend)
+			.field("population", &self.population)
+			.field("init_fn", &"<function to initialize model>")
+			.field("population_max", &self.population_max)
+			.field("population_min", &self.population_min)
+			.field("mutation_std", &self.mutation_std)
+			.field("evaluator", &self.evaluator)
+			.finish()
 	}
 }
