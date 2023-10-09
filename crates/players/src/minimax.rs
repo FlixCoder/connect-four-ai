@@ -5,30 +5,29 @@ use std::fmt::Debug;
 use game::{Board, GameResult, Player, Team};
 
 /// Type for heuristic function.
-type HeuristicFn = Box<dyn Fn(&Board, Team) -> f64 + Send + Sync>;
+type HeuristicFn<'a> = &'a (dyn Fn(&Board, Team) -> f64 + Send + Sync);
 
 /// Minimax player with a custom heuristic.
-pub struct MinimaxPlayer {
+pub struct MinimaxPlayer<'a> {
 	/// Deepness to do minimax search to.
 	deepness: usize,
 	/// Heuristic function to compute the value of board positions. 0.0 should
 	/// be a draw, anything above is winning, below zero is losing position. The
 	/// strength of is shown by the absolute number.
-	heuristic: HeuristicFn,
+	heuristic: HeuristicFn<'a>,
 }
 
-impl MinimaxPlayer {
+impl<'a> MinimaxPlayer<'a> {
 	/// Create new minimax player with custom heuristic.
-	fn new<H>(deepness: usize, heuristic: H) -> Self
-	where
-		H: Fn(&Board, Team) -> f64 + Send + Sync + 'static,
-	{
-		Self { deepness, heuristic: Box::new(heuristic) }
+	#[must_use]
+	pub fn new(deepness: usize, heuristic: HeuristicFn<'a>) -> Self {
+		Self { deepness, heuristic }
 	}
 
 	/// Create new minimax player with heuristic 1.
+	#[must_use]
 	pub fn new_1(deepness: usize) -> Self {
-		Self::new(deepness, Board::heuristic_1)
+		Self::new(deepness, &Board::heuristic_1)
 	}
 
 	/// Our turn, take the best value out of our turns.
@@ -87,7 +86,7 @@ impl MinimaxPlayer {
 	}
 }
 
-impl Player for MinimaxPlayer {
+impl<'a> Player for MinimaxPlayer<'a> {
 	fn make_move(&self, board: &Board, me: Team) -> usize {
 		board
 			.possible_moves()
@@ -106,7 +105,7 @@ impl Player for MinimaxPlayer {
 	}
 }
 
-impl Debug for MinimaxPlayer {
+impl<'a> Debug for MinimaxPlayer<'a> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("MinimaxPlayer")
 			.field("deepness", &self.deepness)

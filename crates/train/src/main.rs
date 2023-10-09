@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use burn::tensor::backend::Backend;
-use players::{ModelPlayer, NdArrayBackend};
+use players::{AiValuePlayer, NdArrayBackend};
 use train::{evaluation::*, optimizers::*, time, EsTrainer, EvolutionTrainer};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,7 +20,7 @@ fn main_es() -> Result<(), Box<dyn std::error::Error>> {
 	let mut models = load_all::<NdArrayBackend>(model_path);
 	let model = if models.is_empty() {
 		println!("Starting with new model");
-		ModelPlayer::init()
+		AiValuePlayer::init(1)
 	} else {
 		models.swap_remove(0)
 	};
@@ -68,7 +68,7 @@ fn main_evo() -> Result<(), Box<dyn std::error::Error>> {
 
 	let mut trainer = EvolutionTrainer::builder()
 		.population(population)
-		.init_fn(Box::new(ModelPlayer::init))
+		.init_fn(Box::new(|| AiValuePlayer::init(1)))
 		.evaluator(PlayerPlusEvaluator::default())
 		.population_max(200)
 		.population_min(15)
@@ -97,7 +97,7 @@ fn main_evo() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Load all models numbered by index from the given folder.
-fn load_all<B>(folder: impl AsRef<Path>) -> Vec<ModelPlayer<B>>
+fn load_all<B>(folder: impl AsRef<Path>) -> Vec<AiValuePlayer<B>>
 where
 	B: Backend,
 {
@@ -110,7 +110,7 @@ where
 		let entry = entry.expect("read directory entry");
 		if entry.path().is_file() {
 			let file = folder.as_ref().join(entry.path().file_stem().expect("model file name"));
-			let model = ModelPlayer::init().load(file).expect("loading model");
+			let model = AiValuePlayer::init(1).load(file).expect("loading model");
 			models.push(model);
 		}
 	}
@@ -118,7 +118,7 @@ where
 }
 
 /// Save all models numbered by index to the given folder.
-fn save_all<B>(folder: impl AsRef<Path>, models: &[ModelPlayer<B>])
+fn save_all<B>(folder: impl AsRef<Path>, models: &[AiValuePlayer<B>])
 where
 	B: Backend,
 {

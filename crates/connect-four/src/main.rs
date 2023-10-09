@@ -2,13 +2,14 @@
 #![allow(clippy::print_stdout, clippy::expect_used)]
 
 use game::{Error, Game, GameResult};
-use players::{IoPlayer, ModelPlayer, NdArrayBackend};
+use players::{AiValuePlayer, IoPlayer, NdArrayBackend};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let ai = ModelPlayer::<NdArrayBackend>::init().load("model").unwrap_or_else(|err| {
+	let model_path = "./model";
+	let ai = AiValuePlayer::<NdArrayBackend>::init(5).load(model_path).unwrap_or_else(|err| {
 		println!("Failed loading model: {err}");
 		println!("Starting with new model");
-		ModelPlayer::init()
+		AiValuePlayer::init(5)
 	});
 
 	let mut game = Game::builder().player_x(&IoPlayer).player_o(&ai).build();
