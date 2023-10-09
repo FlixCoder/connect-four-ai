@@ -28,15 +28,15 @@ fn main_es() -> Result<(), Box<dyn std::error::Error>> {
 	let optimizer = Sgd::load(optimizer_path).unwrap_or_else(|err| {
 		println!("Failed loading optimizer: {err}");
 		println!("Starting with new optimizer");
-		Sgd::builder().learning_rate(0.05).momentum(0.9).build()
+		Sgd::builder().learning_rate(0.025).momentum(0.9).build()
 	});
 
 	let mut trainer = EsTrainer::builder()
 		.model(model)
-		.evaluator(PlayerPlusEvaluator::default())
+		.evaluator(player_scores)
 		.optimizer(optimizer)
 		.samples(100)
-		.std(0.025)
+		.std(0.02)
 		.build();
 
 	for i in 0..10000 {
@@ -47,7 +47,7 @@ fn main_es() -> Result<(), Box<dyn std::error::Error>> {
 		let score = test_minimax::<_, 5>(trainer.model());
 		println!("Minimax performance: {score:.1}");
 
-		if i % 10 == 0 {
+		if i % 5 == 0 {
 			save_all(model_path, &[trainer.model().clone()]);
 			let optimizer = trainer.optimizer();
 			optimizer.save(optimizer_path)?;
@@ -69,12 +69,12 @@ fn main_evo() -> Result<(), Box<dyn std::error::Error>> {
 	let mut trainer = EvolutionTrainer::builder()
 		.population(population)
 		.init_fn(Box::new(|| AiValuePlayer::init(1)))
-		.evaluator(PlayerPlusEvaluator::default())
+		.evaluator(player_scores)
 		.population_max(200)
-		.population_min(15)
-		.generate_new(0.02)
+		.population_min(20)
+		.generate_new(0.01)
 		.mutation_probability(0.1)
-		.mutation_std(0.02)
+		.mutation_std(0.005)
 		.build();
 
 	for i in 0..10000 {
@@ -85,7 +85,7 @@ fn main_evo() -> Result<(), Box<dyn std::error::Error>> {
 		let score = test_minimax::<_, 5>(&trainer.population()[0]);
 		println!("Minimax performance: {score:.1}");
 
-		if i % 10 == 0 {
+		if i % 5 == 0 {
 			save_all(model_path, trainer.population());
 			println!("Models saved!");
 		}
