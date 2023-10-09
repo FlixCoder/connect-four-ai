@@ -5,9 +5,64 @@ use std::path::Path;
 
 use burn::tensor::backend::Backend;
 use players::{ModelPlayer, NdArrayBackend};
-use train::{evaluation::*, time, EvolutionTrainer};
+use train::{evaluation::*, optimizers::*, time, EsTrainer, EvolutionTrainer};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+	main_evo()
+}
+
+/// Run training using evolution strategies.
+#[allow(dead_code)]
+fn main_es() -> Result<(), Box<dyn std::error::Error>> {
+	let model_path = "./models";
+	let optimizer_path = "./optimizer.json";
+
+	let mut models = load_all::<NdArrayBackend>(model_path);
+	let model = if models.is_empty() {
+		println!("Starting with new model");
+		ModelPlayer::init()
+	} else {
+		models.swap_remove(0)
+	};
+
+	let optimizer = Sgd::load(optimizer_path).unwrap_or_else(|err| {
+		println!("Failed loading optimizer: {err}");
+		println!("Starting with new optimizer");
+		Sgd::builder().learning_rate(0.05).momentum(0.9).build()
+	});
+
+	let mut trainer = EsTrainer::builder()
+		.model(model)
+		.evaluator(PlayerPlusEvaluator::default())
+		.optimizer(optimizer)
+		.samples(100)
+		.std(0.025)
+		.build();
+
+	for i in 0..10000 {
+		time!(trainer.train_step(), "One training step");
+
+		let score = time!(test_random::<_, 1000>(trainer.model()), "Testing performance");
+		println!("Random performance: {score:.3}");
+		let score = test_minimax::<_, 5>(trainer.model());
+		println!("Minimax performance: {score:.1}");
+
+		if i % 10 == 0 {
+			save_all(model_path, &[trainer.model().clone()]);
+			let optimizer = trainer.optimizer();
+			optimizer.save(optimizer_path)?;
+			println!("Models saved!");
+		}
+
+		println!();
+	}
+
+	Ok(())
+}
+
+/// Run training using evolution.
+#[allow(dead_code)]
+fn main_evo() -> Result<(), Box<dyn std::error::Error>> {
 	let model_path = "./models";
 	let population = load_all::<NdArrayBackend>(model_path);
 
@@ -17,9 +72,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.evaluator(PlayerPlusEvaluator::default())
 		.population_max(200)
 		.population_min(15)
-		.generate_new(0.0)
+		.generate_new(0.02)
 		.mutation_probability(0.1)
-		.mutation_std(0.01)
+		.mutation_std(0.02)
 		.build();
 
 	for i in 0..10000 {
