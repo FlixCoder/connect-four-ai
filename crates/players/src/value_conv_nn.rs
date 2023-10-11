@@ -28,6 +28,8 @@ pub struct AiValuePlayer<B: Backend> {
 	linear1: Linear<B>,
 	/// Linear layer 2.
 	linear2: Linear<B>,
+	/// Linear layer 3.
+	linear3: Linear<B>,
 }
 
 impl<B: Backend> AiValuePlayer<B> {
@@ -36,9 +38,10 @@ impl<B: Backend> AiValuePlayer<B> {
 	pub fn init(deepness: usize) -> Self {
 		Self {
 			deepness,
-			conv1: Conv2dConfig::new([1, 8], [4, 4]).init(),
-			linear1: LinearConfig::new(8 * 3 * 4, 50).init(), // 4x4 kernel makes 6x7 to 3x4.
-			linear2: LinearConfig::new(50, 1).init(),
+			conv1: Conv2dConfig::new([1, 16], [4, 4]).init(),
+			linear1: LinearConfig::new(16 * 3 * 4, 100).init(), // 4x4 kernel makes 6x7 to 3x4.
+			linear2: LinearConfig::new(100, 50).init(),
+			linear3: LinearConfig::new(50, 1).init(),
 		}
 		.no_grad()
 	}
@@ -65,6 +68,8 @@ impl<B: Backend> AiValuePlayer<B> {
 		let data = self.linear1.forward(data);
 		let data = tanh(data);
 		let data = self.linear2.forward(data);
+		let data = tanh(data);
+		let data = self.linear3.forward(data);
 		tanh(data)
 	}
 

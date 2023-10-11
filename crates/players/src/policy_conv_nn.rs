@@ -35,8 +35,8 @@ impl<B: Backend> AiPolicyPlayer<B> {
 	#[must_use]
 	pub fn init() -> Self {
 		Self {
-			conv1: Conv2dConfig::new([1, 8], [4, 4]).init(),
-			linear1: LinearConfig::new(8 * 3 * 4, 100).init(), // 4x4 kernel makes 6x7 to 3x4.
+			conv1: Conv2dConfig::new([1, 16], [4, 4]).init(),
+			linear1: LinearConfig::new(16 * 3 * 4, 100).init(), // 4x4 kernel makes 6x7 to 3x4.
 			linear2: LinearConfig::new(100, 50).init(),
 			linear3: LinearConfig::new(50, 7).init(),
 			activation: GELU::new(),
