@@ -65,7 +65,7 @@ where
 {
 	models
 		.par_iter()
-		.map(|model| test_random::<_, 1000>(model) + test_minimax::<_, 5>(model))
+		.map(|model| 2.0_f32.mul_add(test_minimax::<_, 5>(model), test_random::<_, 1000>(model)))
 		.collect()
 }
 
@@ -110,7 +110,8 @@ where
 					previous_score /= (self.previous.len() * 2) as f32;
 				}
 
-				test_random::<_, 1000>(model) + test_minimax::<_, 5>(model) + previous_score
+				2.0_f32.mul_add(test_minimax::<_, 5>(model), test_random::<_, 1000>(model))
+					+ previous_score
 			})
 			.collect::<Vec<_>>();
 
