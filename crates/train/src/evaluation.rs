@@ -193,21 +193,25 @@ where
 	let mut score = 0.0;
 	let minimax_player = MinimaxPlayer::new_1(DEEPNESS);
 
-	let mut game = Game::builder().player_x(model).player_o(&minimax_player).build();
-	let result = game.run_error_loss();
-	match result {
-		GameResult::Winner(Team::X) => score += 1.0,
-		GameResult::Winner(Team::O) => score -= 1.0,
-		_ => {}
+	for _ in 0..5 {
+		let mut game = Game::builder().player_x(model).player_o(&minimax_player).build();
+		let result = game.run_error_loss();
+		match result {
+			GameResult::Winner(Team::X) => score += 1.0,
+			GameResult::Winner(Team::O) => score -= 1.0,
+			_ => {}
+		}
 	}
 
-	let mut game = Game::builder().player_x(&minimax_player).player_o(model).build();
-	let result = game.run_error_loss();
-	match result {
-		GameResult::Winner(Team::X) => score -= 1.0,
-		GameResult::Winner(Team::O) => score += 1.0,
-		_ => {}
+	for _ in 0..5 {
+		let mut game = Game::builder().player_x(&minimax_player).player_o(model).build();
+		let result = game.run_error_loss();
+		match result {
+			GameResult::Winner(Team::X) => score -= 1.0,
+			GameResult::Winner(Team::O) => score += 1.0,
+			_ => {}
+		}
 	}
 
-	score / 2.0
+	score / 10.0
 }

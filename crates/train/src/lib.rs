@@ -266,7 +266,7 @@ where
 		population_scores
 			.sort_unstable_by(|(_, a), (_, b)| b.partial_cmp(a).expect("Score was NaN"));
 		self.population.append(
-			&mut population_scores.into_iter().take(self.population_min).map(|(m, _)| m).collect(),
+			&mut population_scores.into_iter().take(self.population_min).map(|(m, _s)| m).collect(),
 		);
 
 		self
