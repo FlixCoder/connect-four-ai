@@ -193,7 +193,7 @@ where
 	let mut score = 0.0;
 	let minimax_player = MinimaxPlayer::new_1(DEEPNESS);
 
-	for _ in 0..5 {
+	for _ in 0..50 {
 		let mut game = Game::builder().player_x(model).player_o(&minimax_player).build();
 		let result = game.run_error_loss();
 		match result {
@@ -203,7 +203,7 @@ where
 		}
 	}
 
-	for _ in 0..5 {
+	for _ in 0..50 {
 		let mut game = Game::builder().player_x(&minimax_player).player_o(model).build();
 		let result = game.run_error_loss();
 		match result {
@@ -213,5 +213,5 @@ where
 		}
 	}
 
-	score / 10.0
+	score / 100.0
 }

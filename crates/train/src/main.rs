@@ -45,7 +45,7 @@ fn main_es() -> Result<(), Box<dyn std::error::Error>> {
 		let score = time!(test_random::<_, 1000>(trainer.model()), "Testing performance");
 		println!("Random performance: {score:.3}");
 		let score = test_minimax::<_, 5>(trainer.model());
-		println!("Minimax performance: {score:.1}");
+		println!("Minimax performance: {score:.2}");
 
 		if i % 5 == 0 {
 			save_all(model_path, &[trainer.model().clone()]);
@@ -83,7 +83,7 @@ fn main_evo() -> Result<(), Box<dyn std::error::Error>> {
 		let score = time!(test_random::<_, 1000>(&trainer.population()[0]), "Testing performance");
 		println!("Random performance: {score:.3}");
 		let score = test_minimax::<_, 5>(&trainer.population()[0]);
-		println!("Minimax performance: {score:.1}");
+		println!("Minimax performance: {score:.2}");
 
 		if i % 5 == 0 {
 			save_all(model_path, trainer.population());
