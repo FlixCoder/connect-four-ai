@@ -2,6 +2,8 @@
 
 use std::{collections::HashSet, fmt::Display};
 
+use yansi::Paint;
+
 use crate::Error;
 
 /// Width of the connect four field. Must fit in a u8.
@@ -264,6 +266,31 @@ impl Display for Board {
 		}
 		field.pop();
 		f.write_str(&field)
+	}
+}
+
+impl Board {
+	/// Return a colored string representation of the board.
+	#[must_use]
+	pub fn colored_string(&self, for_team: Team) -> String {
+		let (x_color, o_color) = match for_team {
+			Team::X => (yansi::Color::Green, yansi::Color::Red),
+			Team::O => (yansi::Color::Red, yansi::Color::Green),
+		};
+
+		let field_str = self.to_string();
+		field_str
+			.replace('X', &"X".paint(x_color).to_string())
+			.replace('O', &"O".paint(o_color).to_string())
+	}
+}
+
+impl Display for Team {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Team::X => f.write_str("X"),
+			Team::O => f.write_str("O"),
+		}
 	}
 }
 

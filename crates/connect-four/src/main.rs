@@ -1,7 +1,7 @@
 //! Connect four CLI game implementation.
 #![allow(clippy::print_stdout, clippy::expect_used)]
 
-use game::{Error, Game, GameResult};
+use game::{Error, Game, GameResult, Team};
 use players::{AiValuePlayer, IoPlayer, NdArrayBackend};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		r => r?,
 	};
 
-	println!("{}", game.board());
+	println!("{}", game.board().colored_string(Team::X));
 	match result {
 		GameResult::Draw => {
 			println!("Good game! That's a draw!");

@@ -1,7 +1,7 @@
 //! Terminal IO player.
 #![allow(clippy::print_stdout)]
 
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 
 use game::{Board, Player, Team};
 
@@ -10,8 +10,12 @@ use game::{Board, Player, Team};
 pub struct IoPlayer;
 
 impl Player for IoPlayer {
-	fn make_move(&self, board: &Board, _me: Team) -> usize {
-		println!("Current board:\n{board}");
+	fn make_move(&self, board: &Board, me: Team) -> usize {
+		if std::io::stdout().is_terminal() {
+			println!("Current board:\n{}", board.colored_string(me));
+		} else {
+			println!("Current board:\n{board}");
+		}
 		println!("0 | 1 | 2 | 3 | 4 | 5 | 6 \n");
 
 		let possible_moves = board.possible_moves();
