@@ -68,7 +68,6 @@ impl Board {
 	/// winners at once, as this can only happen when multiple turns are done
 	/// without checking the state in between.
 	#[must_use]
-	// TODO: Benchmark?
 	pub fn game_result(&self) -> Option<GameResult> {
 		// First check in the y direction as it should be the fastest.
 		for x in 0..W {

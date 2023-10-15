@@ -1,0 +1,15 @@
+[package]
+name = "benchmarking"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+game = { workspace = true }
+players = { workspace = true }
+
+[dev-dependencies]
+criterion = { version = "0.5.1", features = [] }
+
+[[bench]]
+name = "game_result"
+harness = false
