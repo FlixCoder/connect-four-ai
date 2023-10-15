@@ -152,11 +152,11 @@ impl Board {
 			if self.field[x * H + y].is_some() {
 				break;
 			} else {
-				y -= 1;
+				y = y.wrapping_sub(1);
 			}
 		}
 		// Get the tile, return game running if the column is all empty.
-		let Some(team) = self.field[x * H + y] else {
+		let Some(team) = self.field_get_safe(x, y) else {
 			return None;
 		};
 
@@ -498,6 +498,7 @@ mod tests {
 		let mut board = Board::default();
 		board.put_tile(3, Team::X).unwrap();
 		assert_eq!(board.game_result_on_change(3), None);
+		assert_eq!(board.game_result_on_change(0), None);
 
 		let mut board = Board::default();
 		board.put_tile(0, Team::X).unwrap();
