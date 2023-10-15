@@ -133,6 +133,101 @@ impl Board {
 		}
 	}
 
+	/// Get safe access to a tile on the field, returning None if the
+	/// coordinates are out of bounds, as if the field is empty.
+	fn field_get_safe(&self, x: usize, y: usize) -> Option<Team> {
+		self.field.get(x.saturating_mul(H).saturating_add(y)).and_then(|tile| *tile)
+	}
+
+	/// Get current state of the board, returning whether there is a result and
+	/// if so, who won. This only checks based on the last added piece, so could
+	/// return wrong results if called too late.
+	#[must_use]
+	pub fn game_result_on_change(&self, column: usize) -> Option<GameResult> {
+		let x = column;
+
+		// Get y position of the tile.
+		let mut y = H - 1;
+		for _ in 0..H {
+			if self.field[x * H + y].is_some() {
+				break;
+			} else {
+				y -= 1;
+			}
+		}
+		// Get the tile, return game running if the column is all empty.
+		let Some(team) = self.field[x * H + y] else {
+			return None;
+		};
+
+		// Check if there is a win in x direction.
+		if (self.field_get_safe(x.wrapping_sub(3), y) == Some(team)
+			&& self.field_get_safe(x.wrapping_sub(2), y) == Some(team)
+			&& self.field_get_safe(x.wrapping_sub(1), y) == Some(team))
+			|| (self.field_get_safe(x.wrapping_sub(2), y) == Some(team)
+				&& self.field_get_safe(x.wrapping_sub(1), y) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(1), y) == Some(team))
+			|| (self.field_get_safe(x.wrapping_sub(1), y) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(1), y) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(2), y) == Some(team))
+			|| (self.field_get_safe(x.wrapping_add(1), y) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(2), y) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(3), y) == Some(team))
+		{
+			return Some(GameResult::Winner(team));
+		}
+
+		// Check if there is a win in y direction. There cannot be any tiles on top, we
+		// picked to most top one.
+		if self.field_get_safe(x, y.wrapping_sub(3)) == Some(team)
+			&& self.field_get_safe(x, y.wrapping_sub(2)) == Some(team)
+			&& self.field_get_safe(x, y.wrapping_sub(1)) == Some(team)
+		{
+			return Some(GameResult::Winner(team));
+		}
+
+		// Check if there is a win in diagonal up direction.
+		if (self.field_get_safe(x.wrapping_sub(3), y.wrapping_sub(3)) == Some(team)
+			&& self.field_get_safe(x.wrapping_sub(2), y.wrapping_sub(2)) == Some(team)
+			&& self.field_get_safe(x.wrapping_sub(1), y.wrapping_sub(1)) == Some(team))
+			|| (self.field_get_safe(x.wrapping_sub(2), y.wrapping_sub(2)) == Some(team)
+				&& self.field_get_safe(x.wrapping_sub(1), y.wrapping_sub(1)) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(1), y.wrapping_add(1)) == Some(team))
+			|| (self.field_get_safe(x.wrapping_sub(1), y.wrapping_sub(1)) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(1), y.wrapping_add(1)) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(2), y.wrapping_add(2)) == Some(team))
+			|| (self.field_get_safe(x.wrapping_add(1), y.wrapping_add(1)) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(2), y.wrapping_add(2)) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(3), y.wrapping_add(3)) == Some(team))
+		{
+			return Some(GameResult::Winner(team));
+		}
+
+		// Check if there is a win in diagonal down direction.
+		if (self.field_get_safe(x.wrapping_sub(3), y.wrapping_add(3)) == Some(team)
+			&& self.field_get_safe(x.wrapping_sub(2), y.wrapping_add(2)) == Some(team)
+			&& self.field_get_safe(x.wrapping_sub(1), y.wrapping_add(1)) == Some(team))
+			|| (self.field_get_safe(x.wrapping_sub(2), y.wrapping_add(2)) == Some(team)
+				&& self.field_get_safe(x.wrapping_sub(1), y.wrapping_add(1)) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(1), y.wrapping_sub(1)) == Some(team))
+			|| (self.field_get_safe(x.wrapping_sub(1), y.wrapping_add(1)) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(1), y.wrapping_sub(1)) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(2), y.wrapping_sub(2)) == Some(team))
+			|| (self.field_get_safe(x.wrapping_add(1), y.wrapping_sub(1)) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(2), y.wrapping_sub(2)) == Some(team)
+				&& self.field_get_safe(x.wrapping_add(3), y.wrapping_sub(3)) == Some(team))
+		{
+			return Some(GameResult::Winner(team));
+		}
+
+		// Otherwise the game is running or drawn (if it is full).
+		if self.field.iter().any(Option::is_none) {
+			None
+		} else {
+			Some(GameResult::Draw)
+		}
+	}
+
 	/// Return whos turn it is. Just checks the number of set tiles. Empty field
 	/// means X, next O, etc..
 	#[must_use]
@@ -396,5 +491,113 @@ mod tests {
 		board.put_tile(6, Team::O).unwrap();
 		println!("Board:\n{board}");
 		assert_eq!(board.game_result(), Some(GameResult::Draw));
+	}
+
+	#[test]
+	fn state_check_on_change() {
+		let mut board = Board::default();
+		board.put_tile(3, Team::X).unwrap();
+		assert_eq!(board.game_result_on_change(3), None);
+
+		let mut board = Board::default();
+		board.put_tile(0, Team::X).unwrap();
+		board.put_tile(1, Team::X).unwrap();
+		board.put_tile(2, Team::X).unwrap();
+		board.put_tile(3, Team::X).unwrap();
+		assert_eq!(board.game_result_on_change(0), Some(GameResult::Winner(Team::X)));
+		assert_eq!(board.game_result_on_change(1), Some(GameResult::Winner(Team::X)));
+		assert_eq!(board.game_result_on_change(2), Some(GameResult::Winner(Team::X)));
+		assert_eq!(board.game_result_on_change(3), Some(GameResult::Winner(Team::X)));
+
+		let mut board = Board::default();
+		board.put_tile(3, Team::X).unwrap();
+		board.put_tile(3, Team::X).unwrap();
+		board.put_tile(3, Team::X).unwrap();
+		board.put_tile(3, Team::X).unwrap();
+		assert_eq!(board.game_result_on_change(3), Some(GameResult::Winner(Team::X)));
+
+		let mut board = Board::default();
+		board.put_tile(0, Team::X).unwrap();
+		board.put_tile(1, Team::O).unwrap();
+		board.put_tile(1, Team::X).unwrap();
+		board.put_tile(2, Team::O).unwrap();
+		board.put_tile(2, Team::O).unwrap();
+		board.put_tile(2, Team::X).unwrap();
+		board.put_tile(3, Team::O).unwrap();
+		board.put_tile(3, Team::O).unwrap();
+		board.put_tile(3, Team::O).unwrap();
+		board.put_tile(3, Team::X).unwrap();
+		assert_eq!(board.game_result_on_change(0), Some(GameResult::Winner(Team::X)));
+		assert_eq!(board.game_result_on_change(1), Some(GameResult::Winner(Team::X)));
+		assert_eq!(board.game_result_on_change(2), Some(GameResult::Winner(Team::X)));
+		assert_eq!(board.game_result_on_change(3), Some(GameResult::Winner(Team::X)));
+
+		let mut board = Board::default();
+		board.put_tile(3, Team::X).unwrap();
+		board.put_tile(2, Team::O).unwrap();
+		board.put_tile(2, Team::X).unwrap();
+		board.put_tile(1, Team::O).unwrap();
+		board.put_tile(1, Team::O).unwrap();
+		board.put_tile(1, Team::X).unwrap();
+		board.put_tile(0, Team::O).unwrap();
+		board.put_tile(0, Team::O).unwrap();
+		board.put_tile(0, Team::O).unwrap();
+		board.put_tile(0, Team::X).unwrap();
+		assert_eq!(board.game_result_on_change(3), Some(GameResult::Winner(Team::X)));
+		assert_eq!(board.game_result_on_change(2), Some(GameResult::Winner(Team::X)));
+		assert_eq!(board.game_result_on_change(1), Some(GameResult::Winner(Team::X)));
+		assert_eq!(board.game_result_on_change(0), Some(GameResult::Winner(Team::X)));
+
+		let mut board = Board::default();
+		board.put_tile(0, Team::X).unwrap();
+		board.put_tile(0, Team::O).unwrap();
+		board.put_tile(0, Team::X).unwrap();
+		board.put_tile(0, Team::O).unwrap();
+		board.put_tile(0, Team::X).unwrap();
+		board.put_tile(0, Team::O).unwrap();
+		board.put_tile(1, Team::O).unwrap();
+		board.put_tile(1, Team::X).unwrap();
+		board.put_tile(1, Team::O).unwrap();
+		board.put_tile(1, Team::X).unwrap();
+		board.put_tile(1, Team::O).unwrap();
+		board.put_tile(1, Team::X).unwrap();
+		board.put_tile(2, Team::X).unwrap();
+		board.put_tile(2, Team::O).unwrap();
+		board.put_tile(2, Team::X).unwrap();
+		board.put_tile(2, Team::O).unwrap();
+		board.put_tile(2, Team::X).unwrap();
+		board.put_tile(2, Team::O).unwrap();
+		board.put_tile(3, Team::X).unwrap();
+		board.put_tile(3, Team::O).unwrap();
+		board.put_tile(3, Team::X).unwrap();
+		board.put_tile(3, Team::O).unwrap();
+		board.put_tile(3, Team::X).unwrap();
+		board.put_tile(3, Team::O).unwrap();
+		board.put_tile(4, Team::X).unwrap();
+		board.put_tile(4, Team::O).unwrap();
+		board.put_tile(4, Team::X).unwrap();
+		board.put_tile(4, Team::O).unwrap();
+		board.put_tile(4, Team::X).unwrap();
+		board.put_tile(4, Team::O).unwrap();
+		board.put_tile(5, Team::O).unwrap();
+		board.put_tile(5, Team::X).unwrap();
+		board.put_tile(5, Team::O).unwrap();
+		board.put_tile(5, Team::X).unwrap();
+		board.put_tile(5, Team::O).unwrap();
+		board.put_tile(5, Team::X).unwrap();
+		board.put_tile(6, Team::X).unwrap();
+		board.put_tile(6, Team::O).unwrap();
+		board.put_tile(6, Team::X).unwrap();
+		board.put_tile(6, Team::O).unwrap();
+		board.put_tile(6, Team::X).unwrap();
+		board.put_tile(6, Team::O).unwrap();
+		println!("Board:\n{board}");
+		assert_eq!(board.game_result_on_change(0), Some(GameResult::Draw));
+		assert_eq!(board.game_result_on_change(1), Some(GameResult::Draw));
+		assert_eq!(board.game_result_on_change(2), Some(GameResult::Draw));
+		assert_eq!(board.game_result_on_change(3), Some(GameResult::Draw));
+		assert_eq!(board.game_result_on_change(4), Some(GameResult::Draw));
+		assert_eq!(board.game_result_on_change(5), Some(GameResult::Draw));
+		assert_eq!(board.game_result_on_change(6), Some(GameResult::Draw));
 	}
 }
