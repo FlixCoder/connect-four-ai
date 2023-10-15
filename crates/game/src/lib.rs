@@ -37,14 +37,14 @@ impl<'a> Game<'a> {
 			let move_x = self.player_x.make_move(&self.board, Team::X);
 			self.board.put_tile(move_x, Team::X)?;
 
-			if let Some(result) = self.board.game_result() {
+			if let Some(result) = self.board.game_result_on_change(move_x) {
 				return Ok(result);
 			}
 
 			let move_o = self.player_o.make_move(&self.board, Team::O);
 			self.board.put_tile(move_o, Team::O)?;
 
-			if let Some(result) = self.board.game_result() {
+			if let Some(result) = self.board.game_result_on_change(move_o) {
 				return Ok(result);
 			}
 		}
@@ -60,7 +60,7 @@ impl<'a> Game<'a> {
 				Ok(_) => {}
 			}
 
-			if let Some(result) = self.board.game_result() {
+			if let Some(result) = self.board.game_result_on_change(move_x) {
 				return result;
 			}
 
@@ -71,7 +71,7 @@ impl<'a> Game<'a> {
 				Ok(_) => {}
 			}
 
-			if let Some(result) = self.board.game_result() {
+			if let Some(result) = self.board.game_result_on_change(move_o) {
 				return result;
 			}
 		}
