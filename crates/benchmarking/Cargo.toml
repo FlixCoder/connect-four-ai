@@ -17,3 +17,7 @@ harness = false
 [[bench]]
 name = "random_game"
 harness = false
+
+[[bench]]
+name = "minimax_player"
+harness = false
