@@ -136,7 +136,10 @@ impl Board {
 	/// Get safe access to a tile on the field, returning None if the
 	/// coordinates are out of bounds, as if the field is empty.
 	fn field_get_safe(&self, x: usize, y: usize) -> Option<Team> {
-		self.field.get(x.saturating_mul(H).saturating_add(y)).and_then(|tile| *tile)
+		if x >= W || y >= H {
+			return None;
+		}
+		self.field[x * H + y]
 	}
 
 	/// Get current state of the board, returning whether there is a result and
@@ -600,5 +603,59 @@ mod tests {
 		assert_eq!(board.game_result_on_change(4), Some(GameResult::Draw));
 		assert_eq!(board.game_result_on_change(5), Some(GameResult::Draw));
 		assert_eq!(board.game_result_on_change(6), Some(GameResult::Draw));
+	}
+
+	#[test]
+	fn check_state_example_1() {
+		let mut board = Board::default();
+
+		board.put_tile(0, Team::O).unwrap();
+		board.put_tile(1, Team::X).unwrap();
+		board.put_tile(2, Team::O).unwrap();
+		board.put_tile(3, Team::X).unwrap();
+		board.put_tile(5, Team::O).unwrap();
+		board.put_tile(6, Team::O).unwrap();
+
+		board.put_tile(0, Team::O).unwrap();
+		board.put_tile(1, Team::O).unwrap();
+		board.put_tile(2, Team::X).unwrap();
+		board.put_tile(3, Team::X).unwrap();
+		board.put_tile(5, Team::X).unwrap();
+		board.put_tile(6, Team::O).unwrap();
+
+		board.put_tile(0, Team::X).unwrap();
+		board.put_tile(1, Team::X).unwrap();
+		board.put_tile(2, Team::O).unwrap();
+		board.put_tile(3, Team::O).unwrap();
+		board.put_tile(5, Team::X).unwrap();
+		board.put_tile(6, Team::X).unwrap();
+
+		board.put_tile(0, Team::O).unwrap();
+		board.put_tile(2, Team::X).unwrap();
+		board.put_tile(3, Team::X).unwrap();
+		board.put_tile(5, Team::O).unwrap();
+		board.put_tile(6, Team::O).unwrap();
+
+		board.put_tile(0, Team::X).unwrap();
+		board.put_tile(2, Team::X).unwrap();
+		board.put_tile(3, Team::O).unwrap();
+		board.put_tile(5, Team::O).unwrap();
+		board.put_tile(6, Team::X).unwrap();
+
+		board.put_tile(0, Team::O).unwrap();
+		board.put_tile(2, Team::X).unwrap();
+		board.put_tile(3, Team::X).unwrap();
+		board.put_tile(5, Team::X).unwrap();
+		board.put_tile(6, Team::O).unwrap();
+
+		println!("Board:\n{board}");
+		assert_eq!(board.game_result(), None);
+		assert_eq!(board.game_result_on_change(0), None);
+		assert_eq!(board.game_result_on_change(1), None);
+		assert_eq!(board.game_result_on_change(2), None);
+		assert_eq!(board.game_result_on_change(3), None);
+		assert_eq!(board.game_result_on_change(4), None);
+		assert_eq!(board.game_result_on_change(5), None);
+		assert_eq!(board.game_result_on_change(6), None);
 	}
 }
